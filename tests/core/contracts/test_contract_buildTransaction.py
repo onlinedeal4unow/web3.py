@@ -1,20 +1,22 @@
-import pytest
+# -*- coding: utf-8 -*-
 
-from eth_utils.toolz import (
-    dissoc,
-)
+import pytest
 
 from web3.exceptions import (
     ValidationError,
 )
+from web3.utils.toolz import (
+    dissoc,
+)
 
-# -*- coding: utf-8 -*-
+# Ignore warning in pyethereum 1.6 - will go away with the upgrade
+pytestmark = pytest.mark.filterwarnings("ignore:implicit cast from 'char *'")
 
 
 @pytest.fixture()
 def math_contract(web3, MathContract, address_conversion_func):
     deploy_txn = MathContract.constructor().transact()
-    deploy_receipt = web3.eth.wait_for_transaction_receipt(deploy_txn)
+    deploy_receipt = web3.eth.waitForTransactionReceipt(deploy_txn)
     assert deploy_receipt is not None
     math_contract_address = address_conversion_func(deploy_receipt['contractAddress'])
     _math_contract = MathContract(address=math_contract_address)
@@ -23,12 +25,12 @@ def math_contract(web3, MathContract, address_conversion_func):
 
 
 @pytest.fixture()
-def fallback_function_contract(web3, FallbackFunctionContract, address_conversion_func):
-    deploy_txn = FallbackFunctionContract.constructor().transact()
-    deploy_receipt = web3.eth.wait_for_transaction_receipt(deploy_txn)
+def fallback_function_contract(web3, FallballFunctionContract, address_conversion_func):
+    deploy_txn = FallballFunctionContract.constructor().transact()
+    deploy_receipt = web3.eth.waitForTransactionReceipt(deploy_txn)
     assert deploy_receipt is not None
     fallback_contract_address = address_conversion_func(deploy_receipt['contractAddress'])
-    _fallback_contract = FallbackFunctionContract(address=fallback_contract_address)
+    _fallback_contract = FallballFunctionContract(address=fallback_contract_address)
     assert _fallback_contract.address == fallback_contract_address
     return _fallback_contract
 
@@ -36,7 +38,7 @@ def fallback_function_contract(web3, FallbackFunctionContract, address_conversio
 @pytest.fixture()
 def payable_tester_contract(web3, PayableTesterContract, address_conversion_func):
     deploy_txn = PayableTesterContract.constructor().transact()
-    deploy_receipt = web3.eth.wait_for_transaction_receipt(deploy_txn)
+    deploy_receipt = web3.eth.waitForTransactionReceipt(deploy_txn)
     assert deploy_receipt is not None
     payable_tester_address = address_conversion_func(deploy_receipt['contractAddress'])
     _payable_tester = PayableTesterContract(address=payable_tester_address)
@@ -54,8 +56,8 @@ def test_build_transaction_not_paying_to_nonpayable_function(
         'to': payable_tester_contract.address,
         'data': '0xe4cb8f5c',
         'value': 0,
-        'gasPrice': 10 ** 9,
-        'chainId': 61,
+        'gasPrice': 1,
+        'chainId': None,
     }
 
 
@@ -75,8 +77,8 @@ def test_build_transaction_with_contract_no_arguments(web3, math_contract, build
         'to': math_contract.address,
         'data': '0xd09de08a',
         'value': 0,
-        'gasPrice': 10 ** 9,
-        'chainId': 61,
+        'gasPrice': 1,
+        'chainId': None,
     }
 
 
@@ -86,8 +88,8 @@ def test_build_transaction_with_contract_fallback_function(web3, fallback_functi
         'to': fallback_function_contract.address,
         'data': '0x',
         'value': 0,
-        'gasPrice': 10 ** 9,
-        'chainId': 61,
+        'gasPrice': 1,
+        'chainId': None,
     }
 
 
@@ -105,8 +107,8 @@ def test_build_transaction_with_contract_class_method(
         'to': math_contract.address,
         'data': '0xd09de08a',
         'value': 0,
-        'gasPrice': 10 ** 9,
-        'chainId': 61,
+        'gasPrice': 1,
+        'chainId': None,
     }
 
 
@@ -119,22 +121,22 @@ def test_build_transaction_with_contract_default_account_is_set(
         'to': math_contract.address,
         'data': '0xd09de08a',
         'value': 0,
-        'gasPrice': 10 ** 9,
-        'chainId': 61,
+        'gasPrice': 1,
+        'chainId': None,
     }
 
 
 def test_build_transaction_with_gas_price_strategy_set(web3, math_contract, buildTransaction):
     def my_gas_price_strategy(web3, transaction_params):
         return 5
-    web3.eth.set_gas_price_strategy(my_gas_price_strategy)
+    web3.eth.setGasPriceStrategy(my_gas_price_strategy)
     txn = buildTransaction(contract=math_contract, contract_function='increment')
     assert dissoc(txn, 'gas') == {
         'to': math_contract.address,
         'data': '0xd09de08a',
         'value': 0,
         'gasPrice': 5,
-        'chainId': 61,
+        'chainId': None,
     }
 
 
@@ -162,31 +164,31 @@ def test_build_transaction_with_contract_to_address_supplied_errors(web3,
         (
             {}, (5,), {}, {
                 'data': '0x7cf5dab00000000000000000000000000000000000000000000000000000000000000005',  # noqa: E501
-                'value': 0, 'gasPrice': 10 ** 9, 'chainId': 61,
+                'value': 0, 'gasPrice': 1, 'chainId': None,
             }, False
         ),
         (
             {'gas': 800000}, (5,), {}, {
                 'data': '0x7cf5dab00000000000000000000000000000000000000000000000000000000000000005',  # noqa: E501
-                'value': 0, 'gasPrice': 10 ** 9, 'chainId': 61,
+                'value': 0, 'gasPrice': 1, 'chainId': None,
             }, False
         ),
         (
-            {'gasPrice': 10 ** 9}, (5,), {}, {
+            {'gasPrice': 21000000000}, (5,), {}, {
                 'data': '0x7cf5dab00000000000000000000000000000000000000000000000000000000000000005',  # noqa: E501
-                'value': 0, 'gasPrice': 10 ** 9, 'chainId': 61,
+                'value': 0, 'gasPrice': 21000000000, 'chainId': None,
             }, False
         ),
         (
             {'nonce': 7}, (5,), {}, {
                 'data': '0x7cf5dab00000000000000000000000000000000000000000000000000000000000000005',  # noqa: E501
-                'value': 0, 'gasPrice': 10 ** 9, 'nonce': 7, 'chainId': 61,
+                'value': 0, 'gasPrice': 1, 'nonce': 7, 'chainId': None,
             }, True
         ),
         (
             {'value': 20000}, (5,), {}, {
                 'data': '0x7cf5dab00000000000000000000000000000000000000000000000000000000000000005',  # noqa: E501
-                'value': 20000, 'gasPrice': 10 ** 9, 'chainId': 61,
+                'value': 20000, 'gasPrice': 1, 'chainId': None,
             }, False
         ),
     ),

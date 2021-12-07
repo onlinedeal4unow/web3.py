@@ -1,11 +1,6 @@
 import pytest
 
-from eth_account import (
-    Account,
-)
-from eth_account.signers.local import (
-    LocalAccount,
-)
+import eth_account
 import eth_keys
 from eth_tester.exceptions import (
     ValidationError,
@@ -13,16 +8,6 @@ from eth_tester.exceptions import (
 from eth_utils import (
     to_bytes,
     to_hex,
-)
-from eth_utils.exceptions import (
-    ValidationError as EthUtilsValidationError,
-)
-from eth_utils.toolz import (
-    assoc,
-    dissoc,
-    identity,
-    merge,
-    valfilter,
 )
 from hexbytes import (
     HexBytes,
@@ -45,6 +30,11 @@ from web3.providers import (
 from web3.providers.eth_tester import (
     EthereumTesterProvider,
 )
+from web3.utils.toolz import (
+    identity,
+    merge,
+    valfilter,
+)
 
 PRIVATE_KEY_1 = to_bytes(
     hexstr='0x6a8b4de52b288e111c14e1c4b868bc125d325d40331d86d875a3467dd44bf829')
@@ -58,7 +48,7 @@ ADDRESS_2 = '0x91eD14b5956DBcc1310E65DC4d7E82f02B95BA46'
 
 KEY_FUNCS = (
     eth_keys.keys.PrivateKey,
-    Account.from_key,
+    eth_account.Account.privateKeyToAccount,
     HexBytes,
     to_hex,
     identity,
@@ -94,18 +84,17 @@ def result_generator_middleware():
     return construct_result_generator_middleware({
         'eth_sendRawTransaction': lambda *args: args,
         'net_version': lambda *_: 1,
-        'eth_chainId': lambda *_: "0x02",
     })
 
 
 @pytest.fixture()
 def w3_base():
-    return Web3(provider=DummyProvider(), middlewares=[])
+    return Web3(providers=[DummyProvider()], middlewares=[])
 
 
 @pytest.fixture()
 def w3_dummy(w3_base, result_generator_middleware):
-    w3_base.middleware_onion.add(result_generator_middleware)
+    w3_base.middleware_stack.add(result_generator_middleware)
     return w3_base
 
 
@@ -141,56 +130,41 @@ def hex_to_bytes(s):
 )
 def test_sign_and_send_raw_middleware(
         w3_dummy,
+        w3,
         method,
         from_,
         expected,
         key_object):
-    w3_dummy.middleware_onion.add(
+    w3_dummy.middleware_stack.add(
         construct_sign_and_send_raw_middleware(key_object))
 
-    legacy_transaction = {
-        'to': '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf',
-        'from': from_,
-        'gas': 21000,
-        'gasPrice': 10 ** 9,
-        'value': 1,
-        'nonce': 0
-    }
     if isinstance(expected, type) and issubclass(expected, Exception):
         with pytest.raises(expected):
-            w3_dummy.manager.request_blocking(method, [legacy_transaction])
+            w3_dummy.manager.request_blocking(
+                method,
+                [{
+                    'to': '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf',
+                    'from': from_,
+                    'gas': 21000,
+                    'gasPrice': 0,
+                    'value': 1,
+                    'nonce': 0
+                }])
     else:
-        # assert with legacy txn params
-        actual = w3_dummy.manager.request_blocking(method, [legacy_transaction])
-        assert_method_and_txn_signed(actual, expected)
-
-        # assert with dynamic fee transaction params and explicit type
-        dynamic_fee_transaction = dissoc(legacy_transaction, 'gasPrice')
-        dynamic_fee_transaction = assoc(dynamic_fee_transaction, 'maxFeePerGas', 2000000000)
-        dynamic_fee_transaction = assoc(dynamic_fee_transaction, 'maxPriorityFeePerGas', 1000000000)
-        dynamic_fee_transaction = assoc(dynamic_fee_transaction, 'type', '0x2')
-
-        actual_dynamic_fee_call = w3_dummy.manager.request_blocking(
+        actual = w3_dummy.manager.request_blocking(
             method,
-            [dynamic_fee_transaction]
-        )
-        assert_method_and_txn_signed(actual_dynamic_fee_call, expected)
-
-        # assert with dynamic fee transaction params and no explicit type
-        dynamic_fee_transaction_no_type = dissoc(dynamic_fee_transaction, 'type')
-
-        actual_dynamic_fee_call_no_type = w3_dummy.manager.request_blocking(
-            method,
-            [dynamic_fee_transaction_no_type]
-        )
-        assert_method_and_txn_signed(actual_dynamic_fee_call_no_type, expected)
-
-
-def assert_method_and_txn_signed(actual, expected):
-    raw_txn = actual[1][0]
-    actual_method = actual[0]
-    assert actual_method == expected
-    assert isinstance(raw_txn, bytes)
+            [{
+                'to': '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf',
+                'from': from_,
+                'gas': 21000,
+                'gasPrice': 0,
+                'value': 1,
+                'nonce': 0
+            }])
+        raw_txn = actual[1][0]
+        actual_method = actual[0]
+        assert actual_method == expected
+        assert isinstance(raw_txn, bytes)
 
 
 @pytest.fixture()
@@ -214,7 +188,7 @@ def w3():
 )
 def test_gen_normalized_accounts(key_object):
     accounts = gen_normalized_accounts(key_object)
-    assert all(isinstance(account, LocalAccount) for account in accounts.values())
+    assert all(isinstance(account, eth_account.local.LocalAccount) for account in accounts.values())
 
 
 def test_gen_normalized_accounts_type_error(w3):
@@ -227,21 +201,22 @@ def fund_account(w3):
     # fund local account
     tx_value = w3.toWei(10, 'ether')
     for address in (ADDRESS_1, ADDRESS_2):
-        w3.eth.send_transaction({
+        w3.eth.sendTransaction({
             'to': address,
             'from': w3.eth.accounts[0],
             'gas': 21000,
             'value': tx_value})
-        assert w3.eth.get_balance(address) == tx_value
+        assert w3.eth.getBalance(address) == tx_value
 
 
 @pytest.mark.parametrize(
     'transaction,expected,key_object,from_',
     (
         (
+            #  Transaction with set gas
             {
                 'gas': 21000,
-                'gasPrice': 10 ** 9,
+                'gasPrice': 0,
                 'value': 1
             },
             -1,
@@ -249,6 +224,7 @@ def fund_account(w3):
             ADDRESS_1,
         ),
         (
+            #  Transaction with no set gas
             {
                 'value': 1
             },
@@ -256,8 +232,9 @@ def fund_account(w3):
             MIXED_KEY_MIXED_TYPE,
             ADDRESS_1,
         ),
-        # expect validation error + unmanaged account
         (
+            # Transaction with mismatched sender
+            # expect a validation error with sendTransaction + unmanaged account
             {
                 'gas': 21000,
                 'value': 10
@@ -267,6 +244,7 @@ def fund_account(w3):
             ADDRESS_2,
         ),
         (
+            #  Transaction with invalid sender
             {
                 'gas': 21000,
                 'value': 10
@@ -274,48 +252,8 @@ def fund_account(w3):
             InvalidAddress,
             SAME_KEY_MIXED_TYPE,
             '0x0000',
-        ),
-        (
-            {
-                'gas': 21000,
-                'gasPrice': 0,
-                'value': 1
-            },
-            EthUtilsValidationError,
-            MIXED_KEY_MIXED_TYPE,
-            ADDRESS_1,
-        ),
-        (
-            {
-                'type': '0x2',
-                'value': 22,
-                'maxFeePerGas': 2000000000,
-                'maxPriorityFeePerGas': 10 ** 9,
-            },
-            -1,
-            SAME_KEY_MIXED_TYPE,
-            ADDRESS_1,
-        ),
-        (
-            {
-                'value': 22,
-                'maxFeePerGas': 20 ** 9,
-                'maxPriorityFeePerGas': 10 ** 9,
-            },
-            -1,
-            SAME_KEY_MIXED_TYPE,
-            ADDRESS_1,
         )
-    ),
-    ids=[
-        'with set gas',
-        'with no set gas',
-        'with mismatched sender',
-        'with invalid sender',
-        'with gasPrice lower than base fee',
-        'with txn type and dynamic fee txn params',
-        'with dynamic fee txn params and no type',
-    ]
+    )
 )
 def test_signed_transaction(
         w3,
@@ -324,7 +262,7 @@ def test_signed_transaction(
         expected,
         key_object,
         from_):
-    w3.middleware_onion.add(construct_sign_and_send_raw_middleware(key_object))
+    w3.middleware_stack.add(construct_sign_and_send_raw_middleware(key_object))
 
     # Drop any falsy addresses
     to_from = valfilter(bool, {'to': w3.eth.accounts[0], 'from': from_})
@@ -333,11 +271,12 @@ def test_signed_transaction(
 
     if isinstance(expected, type) and issubclass(expected, Exception):
         with pytest.raises(expected):
-            w3.eth.send_transaction(_transaction)
+            start_balance = w3.eth.getBalance(_transaction.get('from', w3.eth.accounts[0]))
+            w3.eth.sendTransaction(_transaction)
     else:
-        start_balance = w3.eth.get_balance(_transaction.get('from', w3.eth.accounts[0]))
-        w3.eth.send_transaction(_transaction)
-        assert w3.eth.get_balance(_transaction.get('from')) <= start_balance + expected
+        start_balance = w3.eth.getBalance(_transaction.get('from', w3.eth.accounts[0]))
+        w3.eth.sendTransaction(_transaction)
+        assert w3.eth.getBalance(_transaction.get('from')) <= start_balance + expected
 
 
 @pytest.mark.parametrize(
@@ -357,7 +296,7 @@ def test_sign_and_send_raw_middleware_with_byte_addresses(
     from_ = from_converter(ADDRESS_1)
     to_ = to_converter(ADDRESS_2)
 
-    w3_dummy.middleware_onion.add(
+    w3_dummy.middleware_stack.add(
         construct_sign_and_send_raw_middleware(private_key))
 
     actual = w3_dummy.manager.request_blocking(

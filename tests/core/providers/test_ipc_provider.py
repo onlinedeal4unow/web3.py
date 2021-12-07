@@ -2,6 +2,7 @@ import os
 import pathlib
 import pytest
 import socket
+import sys
 import tempfile
 from threading import (
     Thread,
@@ -39,10 +40,20 @@ def test_ipc_no_path():
     assert ipc.isConnected() is False
 
 
-def test_ipc_tilda_in_path():
-    expectedPath = str(pathlib.Path.home()) + '/foo'
-    assert IPCProvider('~/foo').ipc_path == expectedPath
-    assert IPCProvider(pathlib.Path('~/foo')).ipc_path == expectedPath
+@pytest.mark.parametrize(
+    'subfolder',
+    (
+        pytest.param(
+            '/foo',
+            marks=pytest.mark.skipif(sys.version_info < (3, 6), reason="path must exist in py3.5"),
+        ),
+        '',
+    ),
+)
+def test_ipc_tilda_in_path(subfolder):
+    expectedPath = str(pathlib.Path.home()) + subfolder
+    assert IPCProvider('~' + subfolder).ipc_path == expectedPath
+    assert IPCProvider(pathlib.Path('~' + subfolder)).ipc_path == expectedPath
 
 
 @pytest.fixture
@@ -87,11 +98,11 @@ def test_sync_waits_for_full_result(jsonrpc_ipc_pipe_path, serve_empty_result):
 
 
 def test_web3_auto_gethdev():
-    assert isinstance(w3.provider, IPCProvider)
+    assert isinstance(w3.providers[0], IPCProvider)
     return_block_with_long_extra_data = construct_fixture_middleware({
         'eth_getBlockByNumber': {'extraData': '0x' + 'ff' * 33},
     })
-    w3.middleware_onion.inject(return_block_with_long_extra_data, layer=0)
-    block = w3.eth.get_block('latest')
+    w3.middleware_stack.inject(return_block_with_long_extra_data, layer=0)
+    block = w3.eth.getBlock('latest')
     assert 'extraData' not in block
     assert block.proofOfAuthorityData == b'\xff' * 33

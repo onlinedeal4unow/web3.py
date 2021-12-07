@@ -7,19 +7,13 @@ The provider is how web3 talks to the blockchain.  Providers take JSON-RPC
 requests and return the response.  This is normally done by submitting the
 request to an HTTP or IPC socket based server.
 
-.. note::
-
-   Web3.py supports one provider per instance. If you have an advanced use case
-   that requires multiple providers, create and configure a new web3 instance
-   per connection.
-
 If you are already happily connected to your Ethereum node, then you
 can skip the rest of the Providers section.
 
 .. _choosing_provider:
 
 Choosing How to Connect to Your Node
-------------------------------------
+--------------------------------------
 
 Most nodes have a variety of ways to connect to them. If you have not
 decided what kind of node to use, head on over to :ref:`choosing_node`
@@ -65,8 +59,6 @@ Then you are ready to initialize your Web3 instance, like so:
 
 Finally, you are ready to :ref:`get started with Web3.py<first_w3_use>`.
 
-.. _automatic_provider:
-
 Automatic vs Manual Providers
 -----------------------------
 
@@ -100,15 +92,12 @@ How Automated Detection Works
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Web3 attempts to connect to nodes in the following order, using the first
-successful connection it can make:
+succesful connection it can make:
 
 1. The connection specified by an environment variable, see :ref:`provider_uri`
-2. :class:`~web3.providers.ipc.IPCProvider`, which looks for several IPC file locations.
-   ``IPCProvider`` will not automatically detect a testnet connection, it is suggested that the
-   user instead uses a ``w3`` instance from ``web3.auto.infura`` (e.g.
-   ``from web3.auto.infura.ropsten import w3``) if they want to auto-detect a testnet.
+2. :class:`~web3.providers.ipc.IPCProvider`, which looks for several IPC file locations
 3. :class:`~web3.providers.rpc.HTTPProvider`, which attempts to connect to "http://localhost:8545"
-4. ``None`` - if no providers are successful, you can still use Web3 APIs
+4. None - if no providers are successful, you can still use Web3 APIs
    that do not require a connection, like:
 
    - :ref:`overview_type_conversions`
@@ -134,11 +123,11 @@ For example, the following retrieves the client enode endpoint for both geth and
 
     connected = w3.isConnected()
 
-    if connected and w3.clientVersion.startswith('Parity'):
+    if connected and w3.version.node.startswith('Parity'):
         enode = w3.parity.enode
 
-    elif connected and w3.clientVersion.startswith('Geth'):
-        enode = w3.geth.admin.nodeInfo['enode']
+    elif connected and w3.version.node.startswith('Geth'):
+        enode = w3.admin.nodeInfo['enode']
 
     else:
         enode = None
@@ -151,7 +140,7 @@ Provider via Environment Variable
 Alternatively, you can set the environment variable ``WEB3_PROVIDER_URI``
 before starting your script, and web3 will look for that provider first.
 
-Valid formats for this environment variable are:
+Valid formats for the this environment variable are:
 
 - ``file:///path/to/node/rpc-json/file.ipc``
 - ``http://192.168.1.2:8545``
@@ -170,16 +159,17 @@ Infura Mainnet
 ~~~~~~~~~~~~~~
 
 To easily connect to the Infura Mainnet remote node, first register for a free
-project ID if you don't have one at https://infura.io/register .
+API key if you don't have one at https://infura.io/register .
 
-Then set the environment variable ``WEB3_INFURA_PROJECT_ID`` with your Project ID::
+Then set the environment variable ``WEB3_INFURA_API_KEY`` with your API key::
 
-    $ export WEB3_INFURA_PROJECT_ID=YourProjectID
+    $ export WEB3_INFURA_API_KEY=YourApiKey
 
 If you have checked the box in the Infura UI indicating that requests need
 an optional secret key, set the environment variable ``WEB3_INFURA_API_SECRET``::
 
-    $ export WEB3_INFURA_API_SECRET=YourProjectSecret
+    $ export WEB3_INFURA_API_SECRET=YourSecretKey
+
 
 .. code-block:: python
 
@@ -190,7 +180,7 @@ an optional secret key, set the environment variable ``WEB3_INFURA_API_SECRET``:
     True
 
 Geth dev Proof of Authority
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 To connect to a ``geth --dev`` Proof of Authority instance with defaults:
 
@@ -212,7 +202,7 @@ local and remote JSON-RPC servers.
 HTTPProvider
 ~~~~~~~~~~~~
 
-.. py:class:: web3.providers.rpc.HTTPProvider(endpoint_uri[, request_kwargs, session])
+.. py:class:: web3.providers.rpc.HTTPProvider(endpoint_uri[, request_kwargs])
 
     This provider handles interactions with an HTTP or HTTPS based JSON-RPC server.
 
@@ -220,15 +210,13 @@ HTTPProvider
       ``'https://localhost:8545'``.  For RPC servers behind HTTP connections
       running on port 80 and HTTPS connections running on port 443 the port can
       be omitted from the URI.
-    * ``request_kwargs`` should be a dictionary of keyword arguments which
-      will be passed onto each http/https POST request made to your node.
-    * ``session`` allows you to pass a ``requests.Session`` object initialized
-      as desired.
+    * ``request_kwargs`` this should be a dictionary of keyword arguments which
+      will be passed onto the http/https request.
 
     .. code-block:: python
 
         >>> from web3 import Web3
-        >>> w3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
+        >>> web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545"))
 
     Note that you should create only one HTTPProvider per python
     process, as the HTTPProvider recycles underlying TCP/IP network connections,
@@ -243,19 +231,7 @@ HTTPProvider
     .. code-block:: python
 
         >>> from web3 import Web3
-        >>> w3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545", request_kwargs={'timeout': 60}))
-
-
-    To tune the connection pool size, you can pass your own ``requests.Session``.
-
-    .. code-block:: python
-
-        >>> from web3 import Web3
-        >>> adapter = requests.adapters.HTTPAdapter(pool_connections=20, pool_maxsize=20)
-        >>> session = requests.Session()
-        >>> session.mount('http://', adapter)
-        >>> session.mount('https://', adapter)
-        >>> w3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545", session=session))
+        >>> web3 = Web3(Web3.HTTPProvider("http://127.0.0.1:8545", request_kwargs={'timeout': 60}))
 
 
 IPCProvider
@@ -266,12 +242,12 @@ IPCProvider
     This provider handles interaction with an IPC Socket based JSON-RPC
     server.
 
-    *  ``ipc_path`` is the filesystem path to the IPC socket:
+    *  ``ipc_path`` is the filesystem path to the IPC socket.:56
 
     .. code-block:: python
 
         >>> from web3 import Web3
-        >>> w3 = Web3(Web3.IPCProvider("~/Library/Ethereum/geth.ipc"))
+        >>> web3 = Web3(Web3.IPCProvider("~/Library/Ethereum/geth.ipc"))
 
     If no ``ipc_path`` is specified, it will use the first IPC file
     it can find from this list:
@@ -280,12 +256,10 @@ IPCProvider
 
       - ``~/.ethereum/geth.ipc``
       - ``~/.local/share/io.parity.ethereum/jsonrpc.ipc``
-      - ``~/.local/share/trinity/mainnet/ipcs-eth1/jsonrpc.ipc``
     - On Mac OS:
 
       - ``~/Library/Ethereum/geth.ipc``
       - ``~/Library/Application Support/io.parity.ethereum/jsonrpc.ipc``
-      - ``~/.local/share/trinity/mainnet/ipcs-eth1/jsonrpc.ipc``
     - On Windows:
 
       - ``\\\.\pipe\geth.ipc``
@@ -295,37 +269,30 @@ IPCProvider
 WebsocketProvider
 ~~~~~~~~~~~~~~~~~
 
-.. py:class:: web3.providers.websocket.WebsocketProvider(endpoint_uri[, websocket_timeout, websocket_kwargs])
+.. py:class:: web3.providers.websocket.WebsocketProvider(endpoint_uri[, websocket_kwargs])
 
     This provider handles interactions with an WS or WSS based JSON-RPC server.
 
     * ``endpoint_uri`` should be the full URI to the RPC endpoint such as
       ``'ws://localhost:8546'``.
-    * ``websocket_timeout`` is the timeout in seconds, used when receiving or
-      sending data over the connection. Defaults to 10.
     * ``websocket_kwargs`` this should be a dictionary of keyword arguments which
       will be passed onto the ws/wss websocket connection.
 
     .. code-block:: python
 
         >>> from web3 import Web3
-        >>> w3 = Web3(Web3.WebsocketProvider("ws://127.0.0.1:8546"))
+        >>> web3 = Web3(Web3.WebsocketProvider("ws://127.0.0.1:8546"))
 
     Under the hood, the ``WebsocketProvider`` uses the python websockets library for
     making requests.  If you would like to modify how requests are made, you can
-    use the ``websocket_kwargs`` to do so.  See the `websockets documentation`_ for
-    available arguments.
-
-    .. _`websockets documentation`: https://websockets.readthedocs.io/en/stable/reference/client.html#websockets.client.WebSocketClientProtocol
-
-    Unlike HTTP connections, the timeout for WS connections is controlled by a
-    separate ``websocket_timeout`` argument, as shown below.
+    use the ``websocket_kwargs`` to do so.  A common use case for this is increasing
+    the timeout for each request.
 
 
     .. code-block:: python
 
         >>> from web3 import Web3
-        >>> w3 = Web3(Web3.WebsocketProvider("ws://127.0.0.1:8546", websocket_timeout=60))
+        >>> web3 = Web3(Web3.WebsocketProvider("http://127.0.0.1:8546", websocket_kwargs={'timeout': 60}))
 
 .. py:currentmodule:: web3.providers.eth_tester
 
@@ -333,25 +300,54 @@ EthereumTesterProvider
 ~~~~~~~~~~~~~~~~~~~~~~
 
 .. warning:: Experimental:  This provider is experimental. There are still significant gaps in
-    functionality. However it is being actively developed and supported.
+    functionality. However, it is the default replacement for
+    :class:`web3.providers.tester.EthereumTesterProvider`
+    and is being actively developed and supported.
 
 .. py:class:: EthereumTesterProvider(eth_tester=None)
 
-    This provider integrates with the ``eth-tester`` library.  The ``eth_tester`` constructor
-    argument should be an instance of the :class:`~eth_tester.EthereumTester` or a subclass of
-    :class:`~eth_tester.backends.base.BaseChainBackend` class provided by the ``eth-tester`` library.
-    If you would like a custom eth-tester instance to test with, see the
-    ``eth-tester`` library `documentation <https://github.com/ethereum/eth-tester>`_ for details.
+    This provider integrates with the ``eth-tester`` library.  The
+    ``eth_tester`` constructor argument should be an instance of the
+    :class:`~eth_tester.EthereumTester` class provided by the ``eth-tester``
+    library.  If you would like a custom eth-tester instance to test with,
+    see the ``eth-tester`` library documentation for details.
 
     .. code-block:: python
 
         >>> from web3 import Web3, EthereumTesterProvider
         >>> w3 = Web3(EthereumTesterProvider())
 
-.. NOTE:: To install the needed dependencies to use EthereumTesterProvider, you can install the
-    pip extras package that has the correct interoperable versions of the ``eth-tester``
-    and ``py-evm`` dependencies needed to do testing: e.g. ``pip install web3[tester]``
 
+
+EthereumTesterProvider (legacy)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. warning:: Deprecated:  This provider is deprecated in favor of
+    :class:`~web3.providers.eth_tester.EthereumTesterProvider` and the newly created eth-tester.
+
+.. py:class:: web3.providers.tester.EthereumTesterProvider()
+
+    This provider can be used for testing.  It uses an ephemeral blockchain
+    backed by the ``ethereum.tester`` module.
+
+    .. code-block:: python
+
+        >>> from web3 import Web3
+        >>> from web3.providers.tester import EthereumTesterProvider
+        >>> w3 = Web3(EthereumTesterProvider())
+
+TestRPCProvider
+~~~~~~~~~~~~~~~
+
+.. warning:: Deprecated:  This provider is deprecated in favor of
+    :class:`~web3.providers.eth_tester.EthereumTesterProvider` and the newly created eth-tester.
+
+.. py:class:: TestRPCProvider()
+
+    This provider can be used for testing.  It uses an ephemeral blockchain
+    backed by the ``ethereum.tester`` module.  This provider will be slower
+    than the ``EthereumTesterProvider`` since it uses an HTTP server for RPC
+    interactions with.
 
 
 AutoProvider
@@ -362,67 +358,27 @@ AutoProvider
 explicitly.
 
 
+Using Multiple Providers
+------------------------
 
-AsyncHTTPProvider
-~~~~~~~~~~~~~~~~~
-
-.. warning:: This provider is unstable and there are still gaps in
-    functionality. However, it is being actively developed.
-
-.. py:class:: web3.providers.async_rpc.AsyncHTTPProvider(endpoint_uri[, request_kwargs])
-
-    This provider handles interactions with an HTTP or HTTPS based JSON-RPC server asynchronously.
-
-    * ``endpoint_uri`` should be the full URI to the RPC endpoint such as
-      ``'https://localhost:8545'``.  For RPC servers behind HTTP connections
-      running on port 80 and HTTPS connections running on port 443 the port can
-      be omitted from the URI.
-    * ``request_kwargs`` should be a dictionary of keyword arguments which
-      will be passed onto each http/https POST request made to your node.
-
-    .. code-block:: python
-
-        >>> from web3 import Web3, AsyncHTTPProvider
-        >>> from web3.eth import AsyncEth
-        >>> from web3.net import AsyncNet
-
-        >>> w3 = Web3(AsyncHTTPProvider("http://127.0.0.1:8545"),
-        ...           modules={'eth': (AsyncEth,), 'net': (AsyncNet,)},
-        ...           middlewares=[])  # See supported middleware section below for middleware options
-
-    Under the hood, the ``AsyncHTTPProvider`` uses the python
-    `aiohttp <https://docs.aiohttp.org/en/stable/>`_ library for making requests.
-
-Supported Methods
-^^^^^^^^^^^^^^^^^
-
-Eth
-***
-- :meth:`web3.eth.block_number <web3.eth.Eth.block_number>`
-- :meth:`web3.eth.coinbase <web3.eth.Eth.coinbase>`
-- :meth:`web3.eth.gas_price <web3.eth.Eth.gas_price>`
-- :meth:`web3.eth.max_priority_fee <web3.eth.Eth.max_priority_fee>`
-- :meth:`web3.eth.call() <web3.eth.Eth.call>`
-- :meth:`web3.eth.estimate_gas() <web3.eth.Eth.estimate_gas>`
-- :meth:`web3.eth.generate_gas_price() <web3.eth.Eth.generate_gas_price>`
-- :meth:`web3.eth.get_balance() <web3.eth.Eth.get_balance>`
-- :meth:`web3.eth.get_block() <web3.eth.Eth.get_block>`
-- :meth:`web3.eth.get_code() <web3.eth.Eth.get_code>`
-- :meth:`web3.eth.get_raw_transaction() <web3.eth.Eth.get_raw_transaction>`
-- :meth:`web3.eth.get_transaction() <web3.eth.Eth.get_transaction>`
-- :meth:`web3.eth.get_transaction_count() <web3.eth.Eth.get_transaction_count>`
-- :meth:`web3.eth.send_transaction() <web3.eth.Eth.send_transaction>`
-- :meth:`web3.eth.send_raw_transaction() <web3.eth.Eth.send_raw_transaction>`
-
-Net
-***
-- :meth:`web3.net.listening() <web3.net.listening>`
-- :meth:`web3.net.peer_count() <web3.net.peer_count>`
-- :meth:`web3.net.version() <web3.net.version>`
+Web3 supports the use of multiple providers.  This is useful for cases where
+you wish to delegate requests across different providers.  To use this feature,
+simply instantiate your web3 instance with an iterable of provider instances.
 
 
+.. code-block:: python
 
-Supported Middleware
-^^^^^^^^^^^^^^^^^^^^
-- :meth:`Gas Price Strategy <web3.middleware.gas_price_strategy_middleware>`
-- :meth:`Buffered Gas Estimate Middleware <web3.middleware.buffered_gas_estimate_middleware>`
+    >>> from web3 import Web3, HTTPProvider
+    >>> from . import MySpecialProvider
+    >>> special_provider = MySpecialProvider()
+    >>> infura_provider = HTTPProvider('https://ropsten.infura.io')
+    >>> web3 = Web3([special_provider, infura_provider])
+
+
+When web3 has multiple providers it will iterate over them in order, trying the
+RPC request and returning the first response it receives.  Any provider which
+*cannot* respond to a request **must** throw a
+``web3.exceptions.CannotHandleRequest`` exception.
+
+If none of the configured providers are able to handle the request, then a
+``web3.exceptions.UnhandledRequest`` exception will be thrown.
