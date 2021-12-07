@@ -108,7 +108,7 @@ class LogFunctions:
     LogAddressNotIndexed = 17
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def emitter_event_ids():
     return LogFunctions
 
@@ -151,6 +151,6 @@ def return_filter(
     return contract.events[event_name].createFilter(**kwargs)
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture()
 def create_filter(request):
     return functools.partial(return_filter)
